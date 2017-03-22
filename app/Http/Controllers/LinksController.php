@@ -67,25 +67,36 @@ class LinksController extends Controller
             'user_name' => auth()->user()->name,
         ]);
 
-        flash('Tạo link thành công!', 'success');
+if (request()->has('title') || request()->has('description') || request()->has('image') || request()->has('website')) {
+            $lin = 'https://www.facebook.com/sharer/sharer.php?u=' . $fullLink . '&title=' . request('title') . '&description=' . request('description') . '&picture=' . request('image') . '&caption=' . request('website');
 
-        return back()->withInput(request()->all())->withLink($link);
+            flash('Tạo link thành công!', 'success');
+
+            return back()->withInput(request()->all())->withLink($link)->withLin($lin);
+        } else {
+            flash('Tạo link thành công!', 'success');
+
+            return back()->withInput(request()->all())->withLink($link);
+        }
     }
 
     public function show($link)
     {
-        if (Redis::exists('links' . $link)) {
-            $realLink = Redis::get('links' . $link);
-            $title = Redis::get('links' . $link . 'title');
+        if (Redis::exists('links.' . $link)) {
+            $realLink = Redis::get('links.' . $link);
+            $title = Redis::get('links.title.' . $link);
+            $fakeLink = Redis::get('links.fake.' . $link);
+        } else {
+            $url = Link::where('link_basic', '=', $link)->first();
+
+            $realLink = $url->real_link;
+            $title = $url->title;
+            $fakeLink = $url->fake_link;
+
+            Redis::set('links.' . $link, $realLink);
+            Redis::set('links.title.' . $link, $title);
+            Redis::set('links.fake.' . $link, $fakeLink);
         }
-
-        $url = Link::where('link_basic', '=', $link)->first();
-
-        $realLink = $url->real_link;
-        $title = $url->title;
-
-        Redis::set('links' . $link, $realLink);
-        Redis::set('links' . $link . 'title', $title);
 
         $ip = ip2long(request()->ip());
         if (Helper::checkBadUserAgents() === true || Helper::checkBadIp($ip)) {
@@ -94,7 +105,7 @@ class LinksController extends Controller
             //     'user_agent' => request()->header('User-Agent'),
             //     'status' => 'blocked',
             // ]);
-            return redirect($url->fake_link);
+            return redirect($fakeLink);
         }
 
         // $query = request()->query();
